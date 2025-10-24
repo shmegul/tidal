@@ -1,0 +1,6 @@
+[package]
+name = "tidal-ast"
+version = "0.1.9"
+edition = "2024"
+
+[dependencies]

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/crates/tidal-api" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/crates/tidal-ast" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/crates/tidal-parser" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/crates/tidal-repl" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/crates/tidal-runtime" vcs="Git" />
+  </component>
+</project>
