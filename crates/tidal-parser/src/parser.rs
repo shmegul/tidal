@@ -363,8 +363,8 @@ impl Parser {
 
     fn parse_postfix(&mut self) -> Result<Expr> {
         let mut expr = self.parse_cast()?;
-        // Range operator ':' (right-binding to next higher-precedence expr)
-        if matches!(self.cur(), TokenKind::Colon) {
+        // Range operator '..' (right-binding to next higher-precedence expr)
+        if matches!(self.cur(), TokenKind::DoubleDot) {
             self.bump();
             let right = self.parse_cast()?;
             expr = Expr::Range(Box::new(expr), Box::new(right));

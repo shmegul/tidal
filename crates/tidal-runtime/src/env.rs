@@ -360,7 +360,7 @@ impl Env {
                 let vb = self.eval_expr_ref(&*b)?;
                 match (va, vb) {
                     (Value::Int(sa), Value::Int(eb)) => Ok(Value::Range(sa, eb)),
-                    _ => Err(Error::runtime("Range ':' bounds must be Int")),
+                    _ => Err(Error::runtime("Range '..' bounds must be Int")),
                 }
             }
             Expr::Array(items) => {
