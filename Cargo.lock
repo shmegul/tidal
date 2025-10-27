@@ -12,10 +12,12 @@ version = "0.1.9"
 
 [[package]]
 name = "tidal-cli"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
+ "tidal-errors",
  "tidal-parser",
  "tidal-runtime",
+ "tidal-vm",
 ]
 
 [[package]]
@@ -43,16 +45,6 @@ dependencies = [
  "tidal-ast",
  "tidal-errors",
  "tidal-lexer",
-]
-
-[[package]]
-name = "tidal-repl"
-version = "0.1.12"
-dependencies = [
- "tidal-errors",
- "tidal-lexer",
- "tidal-parser",
- "tidal-runtime",
 ]
 
 [[package]]
