@@ -603,6 +603,8 @@ pub fn compile(program: &Program) -> CompileOutcome {
                 // Map for quick lookup of immutable temp by original name
                 let mut immut_temp_lookup: HashMap<String, String> = HashMap::new();
                 for (orig, temp, _e) in immut_value_temps.iter() { immut_temp_lookup.insert(orig.clone(), temp.clone()); }
+                // Track temporary aliasing of names to slots inside the loop body
+                let mut alias_saves: Vec<(Rc<String>, Option<usize>)> = Vec::new();
                 // Patches for jumps generated while building body_code (relative to body_code start)
                 let mut body_jump_patches: Vec<(usize, usize)> = Vec::new(); // (pos, target_rel)
                 let mut i = 0usize;
@@ -664,14 +666,16 @@ pub fn compile(program: &Program) -> CompileOutcome {
                         }
                     }
 
-                    // Handle immutable hoisted-let using precomputed temp: re-declare each iter from temp without recomputing RHS
-                    if let Stmt::Let { mutable: m, name: n, ty: _, expr: _e } = &body[i] {
+                    // Handle immutable hoisted-let using precomputed temp: alias name to temp slot for this loop body.
+                    if let Stmt::Let { mutable: _m, name: n, ty: _, expr: _e } = &body[i] {
                         if let Some(temp_name) = immut_temp_lookup.get(n) {
                             let temp_slot = ensure_slot(temp_name, slots, slot_of, names, name_to_idx);
-                            let orig_slot = ensure_slot(n, slots, slot_of, names, name_to_idx);
-                            // Load precomputed value and declare immutable local (shadowing per iteration is permitted by language semantics)
-                            body_code.push(Instr::LoadLocal(temp_slot));
-                            body_code.push(Instr::LetLocal { slot: orig_slot, mutable: *m });
+                            // Ensure the original name exists in the names table to maintain slot/name listings
+                            let name_rc = ensure_name(n, names, name_to_idx);
+                            let prev = slot_of.get(&name_rc).cloned();
+                            alias_saves.push((name_rc.clone(), prev));
+                            slot_of.insert(name_rc, temp_slot);
+                            // Do NOT emit any instructions; we simply reuse the temp slot for all uses of `n`.
                             i += 1;
                             continue;
                         }
@@ -700,6 +704,14 @@ pub fn compile(program: &Program) -> CompileOutcome {
                             Instr::JumpIfFalse(t) => { *t = base_abs + target_rel; }
                             _ => {}
                         }
+                    }
+                }
+
+                // Restore any aliasing we installed for immutable hoisted lets
+                for (nm_rc, prev) in alias_saves.into_iter() {
+                    match prev {
+                        Some(s) => { slot_of.insert(nm_rc, s); }
+                        None => { slot_of.retain(|k, _| !Rc::ptr_eq(k, &nm_rc)); }
                     }
                 }
 
