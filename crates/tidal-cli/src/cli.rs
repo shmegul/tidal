@@ -15,7 +15,8 @@ pub enum Command {
     Fatal(String),
 }
 
-pub const VERSION: &str = "1.0.2-alpha";
+const VERSION_FILE: &str = include_str!("../../../VERSION");
+pub const VERSION: &str = VERSION_FILE;
 
 pub fn help_text(program: &str) -> String {
     format!(
