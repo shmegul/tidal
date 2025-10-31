@@ -174,23 +174,71 @@ pub fn compile(program: &Program) -> CompileOutcome {
                     }
                     _ => {}
                 }
-                compile_expr_inner(l, out, slots, slot_of, names, name_to_idx, consts)?;
-                compile_expr_inner(r, out, slots, slot_of, names, name_to_idx, consts)?;
-                out.push(match op {
-                    Op::Add => Instr::Add,
-                    Op::Sub => Instr::Sub,
-                    Op::Mul => Instr::Mul,
-                    Op::Div => Instr::Div,
-                    Op::Rem => Instr::Rem,
-                    Op::Eq => Instr::CmpEq,
-                    Op::Ne => Instr::CmpNe,
-                    Op::Lt => Instr::CmpLt,
-                    Op::Gt => Instr::CmpGt,
-                    Op::Le => Instr::CmpLe,
-                    Op::Ge => Instr::CmpGe,
-                    _ => return Err(()),
-                });
-                Ok(())
+                match op {
+                    Op::And => {
+                        // Short-circuit AND
+                        compile_expr_inner(l, out, slots, slot_of, names, name_to_idx, consts)?;
+                        let jf1_pos = out.len();
+                        out.push(Instr::JumpIfFalse(usize::MAX));
+                        compile_expr_inner(r, out, slots, slot_of, names, name_to_idx, consts)?;
+                        let jf2_pos = out.len();
+                        out.push(Instr::JumpIfFalse(usize::MAX));
+                        out.push(Instr::LoadBool(true));
+                        let jend_pos = out.len();
+                        out.push(Instr::Jump(usize::MAX));
+                        let false_pos = out.len();
+                        out.push(Instr::LoadBool(false));
+                        let end_pos = out.len();
+                        if let Instr::JumpIfFalse(t) = &mut out[jf1_pos] { *t = false_pos; } else { return Err(()); }
+                        if let Instr::JumpIfFalse(t) = &mut out[jf2_pos] { *t = false_pos; } else { return Err(()); }
+                        if let Instr::Jump(t) = &mut out[jend_pos] { *t = end_pos; } else { return Err(()); }
+                        Ok(())
+                    }
+                    Op::Or => {
+                        // Short-circuit OR
+                        compile_expr_inner(l, out, slots, slot_of, names, name_to_idx, consts)?;
+                        let jf_left_pos = out.len();
+                        out.push(Instr::JumpIfFalse(usize::MAX));
+                        // left is true => result true
+                        out.push(Instr::LoadBool(true));
+                        let jend1_pos = out.len();
+                        out.push(Instr::Jump(usize::MAX));
+                        let eval_right_pos = out.len();
+                        compile_expr_inner(r, out, slots, slot_of, names, name_to_idx, consts)?;
+                        let jf_right_pos = out.len();
+                        out.push(Instr::JumpIfFalse(usize::MAX));
+                        out.push(Instr::LoadBool(true));
+                        let jend2_pos = out.len();
+                        out.push(Instr::Jump(usize::MAX));
+                        let false_pos = out.len();
+                        out.push(Instr::LoadBool(false));
+                        let end_pos = out.len();
+                        if let Instr::JumpIfFalse(t) = &mut out[jf_left_pos] { *t = eval_right_pos; } else { return Err(()); }
+                        if let Instr::JumpIfFalse(t) = &mut out[jf_right_pos] { *t = false_pos; } else { return Err(()); }
+                        if let Instr::Jump(t) = &mut out[jend1_pos] { *t = end_pos; } else { return Err(()); }
+                        if let Instr::Jump(t) = &mut out[jend2_pos] { *t = end_pos; } else { return Err(()); }
+                        Ok(())
+                    }
+                    _ => {
+                        compile_expr_inner(l, out, slots, slot_of, names, name_to_idx, consts)?;
+                        compile_expr_inner(r, out, slots, slot_of, names, name_to_idx, consts)?;
+                        out.push(match op {
+                            Op::Add => Instr::Add,
+                            Op::Sub => Instr::Sub,
+                            Op::Mul => Instr::Mul,
+                            Op::Div => Instr::Div,
+                            Op::Rem => Instr::Rem,
+                            Op::Eq => Instr::CmpEq,
+                            Op::Ne => Instr::CmpNe,
+                            Op::Lt => Instr::CmpLt,
+                            Op::Gt => Instr::CmpGt,
+                            Op::Le => Instr::CmpLe,
+                            Op::Ge => Instr::CmpGe,
+                            _ => return Err(()),
+                        });
+                        Ok(())
+                    }
+                }
             }
             Expr::Cast(e, ty) => {
                 if let Expr::String(cs) = &**e {
