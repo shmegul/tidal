@@ -3,10 +3,6 @@
 version = 4
 
 [[package]]
-name = "tidal-api"
-version = "0.1.0"
-
-[[package]]
 name = "tidal-ast"
 version = "0.1.9"
 
