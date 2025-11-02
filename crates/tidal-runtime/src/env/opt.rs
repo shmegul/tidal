@@ -8,8 +8,8 @@
 use tidal_ast::{Expr, Stmt};
 use tidal_errors::Result;
 
-use crate::value::Value;
 use super::Env;
+use crate::value::Value;
 
 #[derive(Debug, Clone)]
 pub enum OptimizedOp {
@@ -38,11 +38,18 @@ impl Env {
 
     pub fn match_known_pattern(&self, stmt: &Stmt) -> Option<OptimizedOp> {
         match stmt {
-            Stmt::ExprStmt(Expr::If { branches, else_branch: _ }) => {
-                if let Some((Expr::Binary(l, tidal_ast::ops::Op::Eq, r), then_block)) = branches.first() {
+            Stmt::ExprStmt(Expr::If {
+                branches,
+                else_branch: _,
+            }) => {
+                if let Some((Expr::Binary(l, tidal_ast::ops::Op::Eq, r), then_block)) =
+                    branches.first()
+                {
                     // Recognize i == i -> true
                     if let (Expr::Ident(a), Expr::Ident(b)) = (&**l, &**r) {
-                        if a == b { return Some(OptimizedOp::AlwaysTrueThen(then_block.clone())); }
+                        if a == b {
+                            return Some(OptimizedOp::AlwaysTrueThen(then_block.clone()));
+                        }
                     }
                 }
                 // Fallback
@@ -59,9 +66,7 @@ impl Env {
                 let v = self.eval_block_ref(stmts)?;
                 Ok((v, false))
             }
-            OptimizedOp::AlwaysFalseThen(_stmts) => {
-                Ok((Value::Int(0), false))
-            }
+            OptimizedOp::AlwaysFalseThen(_stmts) => Ok((Value::Int(0), false)),
             OptimizedOp::Interpret(stmt) => self.exec_stmt_ref(stmt),
         }
     }

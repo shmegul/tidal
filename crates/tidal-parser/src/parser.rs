@@ -5,10 +5,16 @@
 //!
 //! See the LICENSE file in the root directory of this project for license details.
 
-#![allow(clippy::while_let_loop, clippy::collapsible_if, clippy::collapsible_else_if, clippy::manual_repeat_n, clippy::redundant_closure)]
+#![allow(
+    clippy::while_let_loop,
+    clippy::collapsible_if,
+    clippy::collapsible_else_if,
+    clippy::manual_repeat_n,
+    clippy::redundant_closure
+)]
 use tidal_ast::{Expr, Op, Program, Stmt, Type};
 use tidal_errors::{Error, Result};
-use tidal_lexer::{lex, Token, TokenKind};
+use tidal_lexer::{Token, TokenKind, lex};
 
 pub fn parse_program(input: &str) -> Result<Program> {
     let tokens = lex(input)?;
@@ -23,12 +29,25 @@ struct Parser {
     idx: usize,
 }
 
-
 impl Parser {
-    fn cur(&self) -> &TokenKind { &self.tokens[self.idx].kind }
-    fn cur_token(&self) -> &Token { &self.tokens[self.idx] }
-    fn bump(&mut self) { if self.idx < self.tokens.len() - 1 { self.idx += 1; } }
-    fn peek(&self) -> &TokenKind { if self.idx + 1 < self.tokens.len() { &self.tokens[self.idx + 1].kind } else { &self.tokens[self.idx].kind } }
+    fn cur(&self) -> &TokenKind {
+        &self.tokens[self.idx].kind
+    }
+    fn cur_token(&self) -> &Token {
+        &self.tokens[self.idx]
+    }
+    fn bump(&mut self) {
+        if self.idx < self.tokens.len() - 1 {
+            self.idx += 1;
+        }
+    }
+    fn peek(&self) -> &TokenKind {
+        if self.idx + 1 < self.tokens.len() {
+            &self.tokens[self.idx + 1].kind
+        } else {
+            &self.tokens[self.idx].kind
+        }
+    }
 
     fn eat_newlines_and_semicolons(&mut self) {
         loop {
@@ -48,7 +67,10 @@ impl Parser {
             let mut had_sep = false;
             loop {
                 match self.cur() {
-                    TokenKind::Semicolon | TokenKind::Newline => { had_sep = true; self.bump(); }
+                    TokenKind::Semicolon | TokenKind::Newline => {
+                        had_sep = true;
+                        self.bump();
+                    }
                     _ => break,
                 }
             }
@@ -63,25 +85,26 @@ impl Parser {
     }
 
     fn starts_statement_or_expr(&self, tk: &TokenKind) -> bool {
-        matches!(tk,
+        matches!(
+            tk,
             TokenKind::Ident(_)
-            | TokenKind::Mut
-            | TokenKind::If
-            | TokenKind::For
-            | TokenKind::While
-            | TokenKind::Loop
-            | TokenKind::IntNumber(_)
-            | TokenKind::FloatNumber(_)
-            | TokenKind::StrLiteral(_)
-            | TokenKind::BoolLiteral(_)
-            | TokenKind::CharLiteral(_)
-            | TokenKind::Tilde
-            | TokenKind::Not
-            | TokenKind::Minus
-            | TokenKind::LBracket
-            | TokenKind::LParen
-            | TokenKind::Break
-            | TokenKind::Continue
+                | TokenKind::Mut
+                | TokenKind::If
+                | TokenKind::For
+                | TokenKind::While
+                | TokenKind::Loop
+                | TokenKind::IntNumber(_)
+                | TokenKind::FloatNumber(_)
+                | TokenKind::StrLiteral(_)
+                | TokenKind::BoolLiteral(_)
+                | TokenKind::CharLiteral(_)
+                | TokenKind::Tilde
+                | TokenKind::Not
+                | TokenKind::Minus
+                | TokenKind::LBracket
+                | TokenKind::LParen
+                | TokenKind::Break
+                | TokenKind::Continue
         )
     }
 
@@ -98,14 +121,28 @@ impl Parser {
             TokenKind::Mut => {
                 self.bump();
                 let name = self.expect_ident()?;
-                let ty = if self.eat(TokenKind::Colon) { Some(self.expect_type()?) } else { None };
+                let ty = if self.eat(TokenKind::Colon) {
+                    Some(self.expect_type()?)
+                } else {
+                    None
+                };
                 if self.eat(TokenKind::Equal) {
                     let expr = self.parse_expr()?;
-                    Ok(Stmt::Let { mutable: true, name, ty, expr })
+                    Ok(Stmt::Let {
+                        mutable: true,
+                        name,
+                        ty,
+                        expr,
+                    })
                 } else if let Some(t) = ty.clone() {
                     // default initialize based on type
                     let expr = Self::default_expr_for_type(&t);
-                    Ok(Stmt::Let { mutable: true, name, ty: Some(t), expr })
+                    Ok(Stmt::Let {
+                        mutable: true,
+                        name,
+                        ty: Some(t),
+                        expr,
+                    })
                 } else {
                     Err(self.unexpected("'=' or ': Type' for declaration"))
                 }
@@ -113,57 +150,112 @@ impl Parser {
             TokenKind::For => {
                 self.bump();
                 // Optional 'mut' before loop variable name
-                let mutable = if matches!(self.cur(), TokenKind::Mut) { self.bump(); true } else { false };
+                let mutable = if matches!(self.cur(), TokenKind::Mut) {
+                    self.bump();
+                    true
+                } else {
+                    false
+                };
                 let name = self.expect_ident()?;
                 // expect 'in'
-                if !self.eat(TokenKind::In) { return Err(self.unexpected("'in'")); }
+                if !self.eat(TokenKind::In) {
+                    return Err(self.unexpected("'in'"));
+                }
                 let iter = self.parse_expr()?;
                 // optional 'do' or require newline/semicolon handled by block parser
-                if self.eat(TokenKind::Do) { /* consume do */ } else { self.eat_newlines_and_semicolons(); }
+                if self.eat(TokenKind::Do) { /* consume do */
+                } else {
+                    self.eat_newlines_and_semicolons();
+                }
                 let body = self.parse_block_until(&[TokenKind::End])?;
                 self.expect(TokenKind::End)?;
-                Ok(Stmt::For { mutable, name, iter, body })
+                Ok(Stmt::For {
+                    mutable,
+                    name,
+                    iter,
+                    body,
+                })
             }
             TokenKind::While => {
                 self.bump();
                 let cond = self.parse_expr()?;
-                if self.eat(TokenKind::Do) { /* consume do */ } else { self.eat_newlines_and_semicolons(); }
+                if self.eat(TokenKind::Do) { /* consume do */
+                } else {
+                    self.eat_newlines_and_semicolons();
+                }
                 let body = self.parse_block_until(&[TokenKind::End])?;
                 self.expect(TokenKind::End)?;
                 Ok(Stmt::While { cond, body })
             }
             TokenKind::Loop => {
                 self.bump();
-                if self.eat(TokenKind::Do) { /* consume do */ } else { self.eat_newlines_and_semicolons(); }
+                if self.eat(TokenKind::Do) { /* consume do */
+                } else {
+                    self.eat_newlines_and_semicolons();
+                }
                 let body = self.parse_block_until(&[TokenKind::End])?;
                 self.expect(TokenKind::End)?;
                 Ok(Stmt::Loop { body })
             }
-            TokenKind::Break => { self.bump(); Ok(Stmt::Break) }
-            TokenKind::Continue => { self.bump(); Ok(Stmt::Continue) }
+            TokenKind::Break => {
+                self.bump();
+                Ok(Stmt::Break)
+            }
+            TokenKind::Continue => {
+                self.bump();
+                Ok(Stmt::Continue)
+            }
             TokenKind::Ident(name) => {
                 // lookahead for declaration/compound assignment directly after identifier
-                if matches!(self.peek(), TokenKind::PlusEqual | TokenKind::MinusEqual | TokenKind::StarEqual | TokenKind::SlashEqual | TokenKind::PercentEqual | TokenKind::Colon | TokenKind::Equal) {
+                if matches!(
+                    self.peek(),
+                    TokenKind::PlusEqual
+                        | TokenKind::MinusEqual
+                        | TokenKind::StarEqual
+                        | TokenKind::SlashEqual
+                        | TokenKind::PercentEqual
+                        | TokenKind::Colon
+                        | TokenKind::Equal
+                ) {
                     let name = name.clone();
                     self.bump();
                     if self.eat(TokenKind::PlusEqual) {
-                        let expr = self.parse_expr()?; Ok(Stmt::AddAssign { name, expr })
+                        let expr = self.parse_expr()?;
+                        Ok(Stmt::AddAssign { name, expr })
                     } else if self.eat(TokenKind::MinusEqual) {
-                        let expr = self.parse_expr()?; Ok(Stmt::SubAssign { name, expr })
+                        let expr = self.parse_expr()?;
+                        Ok(Stmt::SubAssign { name, expr })
                     } else if self.eat(TokenKind::StarEqual) {
-                        let expr = self.parse_expr()?; Ok(Stmt::MulAssign { name, expr })
+                        let expr = self.parse_expr()?;
+                        Ok(Stmt::MulAssign { name, expr })
                     } else if self.eat(TokenKind::SlashEqual) {
-                        let expr = self.parse_expr()?; Ok(Stmt::DivAssign { name, expr })
+                        let expr = self.parse_expr()?;
+                        Ok(Stmt::DivAssign { name, expr })
                     } else if self.eat(TokenKind::PercentEqual) {
-                        let expr = self.parse_expr()?; Ok(Stmt::RemAssign { name, expr })
+                        let expr = self.parse_expr()?;
+                        Ok(Stmt::RemAssign { name, expr })
                     } else {
-                        let ty = if self.eat(TokenKind::Colon) { Some(self.expect_type()?) } else { None };
+                        let ty = if self.eat(TokenKind::Colon) {
+                            Some(self.expect_type()?)
+                        } else {
+                            None
+                        };
                         if self.eat(TokenKind::Equal) {
                             let expr = self.parse_expr()?;
-                            Ok(Stmt::Let { mutable: false, name, ty, expr })
+                            Ok(Stmt::Let {
+                                mutable: false,
+                                name,
+                                ty,
+                                expr,
+                            })
                         } else if let Some(t) = ty.clone() {
                             let expr = Self::default_expr_for_type(&t);
-                            Ok(Stmt::Let { mutable: false, name, ty: Some(t), expr })
+                            Ok(Stmt::Let {
+                                mutable: false,
+                                name,
+                                ty: Some(t),
+                                expr,
+                            })
                         } else {
                             Err(self.unexpected("'=' or ': Type' for declaration"))
                         }
@@ -175,12 +267,16 @@ impl Parser {
                     if self.eat(TokenKind::Equal) {
                         let rhs = self.parse_expr()?;
                         match lhs {
-                            Expr::Index(base, idx) => {
-                                match *base {
-                                    Expr::Ident(nm) => Ok(Stmt::AssignIndex { name: nm, index: idx, expr: rhs }),
-                                    _ => Err(self.unexpected("assignable left-hand side (variable array/tuple element)")),
-                                }
-                            }
+                            Expr::Index(base, idx) => match *base {
+                                Expr::Ident(nm) => Ok(Stmt::AssignIndex {
+                                    name: nm,
+                                    index: idx,
+                                    expr: rhs,
+                                }),
+                                _ => Err(self.unexpected(
+                                    "assignable left-hand side (variable array/tuple element)",
+                                )),
+                            },
                             _ => Err(self.unexpected("index assignment target")),
                         }
                     } else {
@@ -201,13 +297,19 @@ impl Parser {
     }
 
     // Precedence (low -> high): or > and > == != > < >= <= > | > ^ > & > << >> > + - > * / > ** > unary (not ~) > primary
-    fn parse_expr(&mut self) -> Result<Expr> { self.parse_or() }
+    fn parse_expr(&mut self) -> Result<Expr> {
+        self.parse_or()
+    }
 
     fn parse_or(&mut self) -> Result<Expr> {
         let mut left = self.parse_and()?;
         loop {
             match self.cur() {
-                TokenKind::Or => { self.bump(); let right = self.parse_and()?; left = Expr::Binary(Box::new(left), Op::Or, Box::new(right)); }
+                TokenKind::Or => {
+                    self.bump();
+                    let right = self.parse_and()?;
+                    left = Expr::Binary(Box::new(left), Op::Or, Box::new(right));
+                }
                 _ => break,
             }
         }
@@ -218,7 +320,11 @@ impl Parser {
         let mut left = self.parse_equality()?;
         loop {
             match self.cur() {
-                TokenKind::And => { self.bump(); let right = self.parse_equality()?; left = Expr::Binary(Box::new(left), Op::And, Box::new(right)); }
+                TokenKind::And => {
+                    self.bump();
+                    let right = self.parse_equality()?;
+                    left = Expr::Binary(Box::new(left), Op::And, Box::new(right));
+                }
                 _ => break,
             }
         }
@@ -229,8 +335,16 @@ impl Parser {
         let mut left = self.parse_comparison()?;
         loop {
             match self.cur() {
-                TokenKind::EqEq => { self.bump(); let right = self.parse_comparison()?; left = Expr::Binary(Box::new(left), Op::Eq, Box::new(right)); }
-                TokenKind::NotEqual => { self.bump(); let right = self.parse_comparison()?; left = Expr::Binary(Box::new(left), Op::Ne, Box::new(right)); }
+                TokenKind::EqEq => {
+                    self.bump();
+                    let right = self.parse_comparison()?;
+                    left = Expr::Binary(Box::new(left), Op::Eq, Box::new(right));
+                }
+                TokenKind::NotEqual => {
+                    self.bump();
+                    let right = self.parse_comparison()?;
+                    left = Expr::Binary(Box::new(left), Op::Ne, Box::new(right));
+                }
                 _ => break,
             }
         }
@@ -241,10 +355,26 @@ impl Parser {
         let mut left = self.parse_bit_or()?;
         loop {
             match self.cur() {
-                TokenKind::Less => { self.bump(); let right = self.parse_bit_or()?; left = Expr::Binary(Box::new(left), Op::Lt, Box::new(right)); }
-                TokenKind::Greater => { self.bump(); let right = self.parse_bit_or()?; left = Expr::Binary(Box::new(left), Op::Gt, Box::new(right)); }
-                TokenKind::LessEqual => { self.bump(); let right = self.parse_bit_or()?; left = Expr::Binary(Box::new(left), Op::Le, Box::new(right)); }
-                TokenKind::GreaterEqual => { self.bump(); let right = self.parse_bit_or()?; left = Expr::Binary(Box::new(left), Op::Ge, Box::new(right)); }
+                TokenKind::Less => {
+                    self.bump();
+                    let right = self.parse_bit_or()?;
+                    left = Expr::Binary(Box::new(left), Op::Lt, Box::new(right));
+                }
+                TokenKind::Greater => {
+                    self.bump();
+                    let right = self.parse_bit_or()?;
+                    left = Expr::Binary(Box::new(left), Op::Gt, Box::new(right));
+                }
+                TokenKind::LessEqual => {
+                    self.bump();
+                    let right = self.parse_bit_or()?;
+                    left = Expr::Binary(Box::new(left), Op::Le, Box::new(right));
+                }
+                TokenKind::GreaterEqual => {
+                    self.bump();
+                    let right = self.parse_bit_or()?;
+                    left = Expr::Binary(Box::new(left), Op::Ge, Box::new(right));
+                }
                 _ => break,
             }
         }
@@ -255,7 +385,11 @@ impl Parser {
         let mut left = self.parse_bit_xor()?;
         loop {
             match self.cur() {
-                TokenKind::Pipe => { self.bump(); let right = self.parse_bit_xor()?; left = Expr::Binary(Box::new(left), Op::BitOr, Box::new(right)); }
+                TokenKind::Pipe => {
+                    self.bump();
+                    let right = self.parse_bit_xor()?;
+                    left = Expr::Binary(Box::new(left), Op::BitOr, Box::new(right));
+                }
                 _ => break,
             }
         }
@@ -266,7 +400,11 @@ impl Parser {
         let mut left = self.parse_bit_and()?;
         loop {
             match self.cur() {
-                TokenKind::Caret => { self.bump(); let right = self.parse_bit_and()?; left = Expr::Binary(Box::new(left), Op::BitXor, Box::new(right)); }
+                TokenKind::Caret => {
+                    self.bump();
+                    let right = self.parse_bit_and()?;
+                    left = Expr::Binary(Box::new(left), Op::BitXor, Box::new(right));
+                }
                 _ => break,
             }
         }
@@ -277,7 +415,11 @@ impl Parser {
         let mut left = self.parse_shift()?;
         loop {
             match self.cur() {
-                TokenKind::Ampersand => { self.bump(); let right = self.parse_shift()?; left = Expr::Binary(Box::new(left), Op::BitAnd, Box::new(right)); }
+                TokenKind::Ampersand => {
+                    self.bump();
+                    let right = self.parse_shift()?;
+                    left = Expr::Binary(Box::new(left), Op::BitAnd, Box::new(right));
+                }
                 _ => break,
             }
         }
@@ -288,8 +430,16 @@ impl Parser {
         let mut left = self.parse_add()?;
         loop {
             match self.cur() {
-                TokenKind::SSLeft => { self.bump(); let right = self.parse_add()?; left = Expr::Binary(Box::new(left), Op::Shl, Box::new(right)); }
-                TokenKind::SSRight => { self.bump(); let right = self.parse_add()?; left = Expr::Binary(Box::new(left), Op::Shr, Box::new(right)); }
+                TokenKind::SSLeft => {
+                    self.bump();
+                    let right = self.parse_add()?;
+                    left = Expr::Binary(Box::new(left), Op::Shl, Box::new(right));
+                }
+                TokenKind::SSRight => {
+                    self.bump();
+                    let right = self.parse_add()?;
+                    left = Expr::Binary(Box::new(left), Op::Shr, Box::new(right));
+                }
                 _ => break,
             }
         }
@@ -300,8 +450,16 @@ impl Parser {
         let mut left = self.parse_mul()?;
         loop {
             match self.cur() {
-                TokenKind::Plus => { self.bump(); let right = self.parse_mul()?; left = Expr::Binary(Box::new(left), Op::Add, Box::new(right)); }
-                TokenKind::Minus => { self.bump(); let right = self.parse_mul()?; left = Expr::Binary(Box::new(left), Op::Sub, Box::new(right)); }
+                TokenKind::Plus => {
+                    self.bump();
+                    let right = self.parse_mul()?;
+                    left = Expr::Binary(Box::new(left), Op::Add, Box::new(right));
+                }
+                TokenKind::Minus => {
+                    self.bump();
+                    let right = self.parse_mul()?;
+                    left = Expr::Binary(Box::new(left), Op::Sub, Box::new(right));
+                }
                 _ => break,
             }
         }
@@ -312,9 +470,21 @@ impl Parser {
         let mut left = self.parse_power()?;
         loop {
             match self.cur() {
-                TokenKind::Star => { self.bump(); let right = self.parse_power()?; left = Expr::Binary(Box::new(left), Op::Mul, Box::new(right)); }
-                TokenKind::Slash => { self.bump(); let right = self.parse_power()?; left = Expr::Binary(Box::new(left), Op::Div, Box::new(right)); }
-                TokenKind::Percent => { self.bump(); let right = self.parse_power()?; left = Expr::Binary(Box::new(left), Op::Rem, Box::new(right)); }
+                TokenKind::Star => {
+                    self.bump();
+                    let right = self.parse_power()?;
+                    left = Expr::Binary(Box::new(left), Op::Mul, Box::new(right));
+                }
+                TokenKind::Slash => {
+                    self.bump();
+                    let right = self.parse_power()?;
+                    left = Expr::Binary(Box::new(left), Op::Div, Box::new(right));
+                }
+                TokenKind::Percent => {
+                    self.bump();
+                    let right = self.parse_power()?;
+                    left = Expr::Binary(Box::new(left), Op::Rem, Box::new(right));
+                }
                 _ => break,
             }
         }
@@ -334,14 +504,26 @@ impl Parser {
 
     fn parse_unary(&mut self) -> Result<Expr> {
         match self.cur() {
-            TokenKind::Tilde => { self.bump(); let expr = self.parse_unary()?; Ok(Expr::BitNot(Box::new(expr))) }
-            TokenKind::Not => { self.bump(); let expr = self.parse_unary()?; Ok(Expr::Not(Box::new(expr))) }
+            TokenKind::Tilde => {
+                self.bump();
+                let expr = self.parse_unary()?;
+                Ok(Expr::BitNot(Box::new(expr)))
+            }
+            TokenKind::Not => {
+                self.bump();
+                let expr = self.parse_unary()?;
+                Ok(Expr::Not(Box::new(expr)))
+            }
             TokenKind::Minus => {
                 // Unary minus: desugar to 0 - expr (keeps precedence with other unary ops)
                 self.bump();
                 let expr = self.parse_unary()?;
                 let zero: std::ffi::c_int = 0 as std::ffi::c_int;
-                Ok(Expr::Binary(Box::new(Expr::Int(zero)), Op::Sub, Box::new(expr)))
+                Ok(Expr::Binary(
+                    Box::new(Expr::Int(zero)),
+                    Op::Sub,
+                    Box::new(expr),
+                ))
             }
             _ => self.parse_primary(),
         }
@@ -375,7 +557,14 @@ impl Parser {
                     self.bump();
                     // expect an integer literal as index
                     match self.cur() {
-                        TokenKind::IntNumber(n) => { let idx = *n; if idx < 0 { return Err(self.unexpected("non-negative index")); } self.bump(); expr = Expr::Index(Box::new(expr), idx as usize); }
+                        TokenKind::IntNumber(n) => {
+                            let idx = *n;
+                            if idx < 0 {
+                                return Err(self.unexpected("non-negative index"));
+                            }
+                            self.bump();
+                            expr = Expr::Index(Box::new(expr), idx as usize);
+                        }
                         _ => return Err(self.unexpected("integer index after '.'")),
                     }
                 }
@@ -394,7 +583,11 @@ impl Parser {
                 let cn: std::ffi::c_int = n as std::ffi::c_int;
                 Ok(Expr::Int(cn))
             }
-            TokenKind::FloatNumber(f) => { let f = *f; self.bump(); Ok(Expr::Double(f as std::ffi::c_double)) }
+            TokenKind::FloatNumber(f) => {
+                let f = *f;
+                self.bump();
+                Ok(Expr::Double(f as std::ffi::c_double))
+            }
             TokenKind::StrLiteral(s) => {
                 let s = s.clone();
                 self.bump();
@@ -404,7 +597,11 @@ impl Parser {
                     Err(_) => Err(self.unexpected("string literal cannot contain NUL (\0) byte")),
                 }
             }
-            TokenKind::BoolLiteral(b) => { let b = *b; self.bump(); Ok(Expr::Bool(b)) }
+            TokenKind::BoolLiteral(b) => {
+                let b = *b;
+                self.bump();
+                Ok(Expr::Bool(b))
+            }
             TokenKind::CharLiteral(c) => {
                 let c = *c;
                 self.bump();
@@ -415,8 +612,12 @@ impl Parser {
                 let cc: std::ffi::c_char = (code as u8) as std::ffi::c_char;
                 Ok(Expr::Char(cc))
             }
-            TokenKind::Ident(name) => { let name = name.clone(); self.bump(); Ok(Expr::Ident(name)) }
-            TokenKind::If => { self.parse_if_expr() }
+            TokenKind::Ident(name) => {
+                let name = name.clone();
+                self.bump();
+                Ok(Expr::Ident(name))
+            }
+            TokenKind::If => self.parse_if_expr(),
             TokenKind::LBracket => {
                 // array literal: [expr, expr, ...]
                 self.bump();
@@ -425,7 +626,11 @@ impl Parser {
                     loop {
                         let e = self.parse_expr()?;
                         elems.push(e);
-                        if self.eat(TokenKind::Comma) { continue; } else { break; }
+                        if self.eat(TokenKind::Comma) {
+                            continue;
+                        } else {
+                            break;
+                        }
                     }
                 }
                 self.expect(TokenKind::RBracket)?;
@@ -439,7 +644,11 @@ impl Parser {
                     loop {
                         let e = self.parse_expr()?;
                         elems.push(e);
-                        if self.eat(TokenKind::Comma) { continue; } else { break; }
+                        if self.eat(TokenKind::Comma) {
+                            continue;
+                        } else {
+                            break;
+                        }
                     }
                 }
                 self.expect(TokenKind::RParen)?;
@@ -457,7 +666,8 @@ impl Parser {
         self.eat_newlines_and_semicolons();
         let mut branches: Vec<(Expr, Vec<Stmt>)> = Vec::new();
         // parse then-branch block
-        let then_block = self.parse_block_until(&[TokenKind::Elsif, TokenKind::Else, TokenKind::End])?;
+        let then_block =
+            self.parse_block_until(&[TokenKind::Elsif, TokenKind::Else, TokenKind::End])?;
         branches.push((cond, then_block));
         let mut else_branch: Option<Vec<Stmt>> = None;
         loop {
@@ -466,7 +676,11 @@ impl Parser {
                     self.bump();
                     let c = self.parse_expr()?;
                     self.eat_newlines_and_semicolons();
-                    let blk = self.parse_block_until(&[TokenKind::Elsif, TokenKind::Else, TokenKind::End])?;
+                    let blk = self.parse_block_until(&[
+                        TokenKind::Elsif,
+                        TokenKind::Else,
+                        TokenKind::End,
+                    ])?;
                     branches.push((c, blk));
                 }
                 TokenKind::Else => {
@@ -480,7 +694,10 @@ impl Parser {
         }
         // expect end
         self.expect(TokenKind::End)?;
-        Ok(Expr::If { branches, else_branch })
+        Ok(Expr::If {
+            branches,
+            else_branch,
+        })
     }
 
     fn parse_block_until(&mut self, terminators: &[TokenKind]) -> Result<Vec<Stmt>> {
@@ -491,10 +708,13 @@ impl Parser {
             let mut is_term = false;
             for t in terminators {
                 if std::mem::discriminant(self.cur()) == std::mem::discriminant(t) {
-                    is_term = true; break;
+                    is_term = true;
+                    break;
                 }
             }
-            if is_term { break; }
+            if is_term {
+                break;
+            }
             if matches!(self.cur(), TokenKind::Eof) {
                 return Err(self.unexpected("block end"));
             }
@@ -507,17 +727,29 @@ impl Parser {
 
     fn expect(&mut self, expected: TokenKind) -> Result<()> {
         if std::mem::discriminant(self.cur()) == std::mem::discriminant(&expected) {
-            self.bump(); Ok(())
-        } else { Err(self.unexpected(&format!("'{:?}'", expected))) }
+            self.bump();
+            Ok(())
+        } else {
+            Err(self.unexpected(&format!("'{:?}'", expected)))
+        }
     }
 
     fn eat(&mut self, expected: TokenKind) -> bool {
-        if std::mem::discriminant(self.cur()) == std::mem::discriminant(&expected) { self.bump(); true } else { false }
+        if std::mem::discriminant(self.cur()) == std::mem::discriminant(&expected) {
+            self.bump();
+            true
+        } else {
+            false
+        }
     }
 
     fn expect_ident(&mut self) -> Result<String> {
         match self.cur() {
-            TokenKind::Ident(name) => { let n = name.clone(); self.bump(); Ok(n) }
+            TokenKind::Ident(name) => {
+                let n = name.clone();
+                self.bump();
+                Ok(n)
+            }
             _ => Err(self.unexpected("identifier")),
         }
     }
@@ -545,7 +777,10 @@ impl Parser {
             Type::Bool => Expr::Bool(false),
             Type::String => Expr::String(std::ffi::CString::new("").unwrap()),
             Type::Char => Expr::Char(0u8 as std::ffi::c_char),
-            Type::Range => Expr::Range(Box::new(Expr::Int(0 as std::ffi::c_int)), Box::new(Expr::Int(0 as std::ffi::c_int))),
+            Type::Range => Expr::Range(
+                Box::new(Expr::Int(0 as std::ffi::c_int)),
+                Box::new(Expr::Int(0 as std::ffi::c_int)),
+            ),
             Type::Array(elem_ty, n) => {
                 let elem = Self::default_expr_for_type(elem_ty);
                 Expr::Array(std::iter::repeat(elem).take(*n).collect())
@@ -568,7 +803,14 @@ impl Parser {
                     return Err(self.unexpected(", between type and length in array type"));
                 }
                 let len = match self.cur() {
-                    TokenKind::IntNumber(n) => { let v = *n; if v < 0 { return Err(self.unexpected("non-negative length")); } self.bump(); v as usize }
+                    TokenKind::IntNumber(n) => {
+                        let v = *n;
+                        if v < 0 {
+                            return Err(self.unexpected("non-negative length"));
+                        }
+                        self.bump();
+                        v as usize
+                    }
                     _ => return Err(self.unexpected("array length integer")),
                 };
                 self.expect(TokenKind::RBracket)?;
@@ -581,7 +823,11 @@ impl Parser {
                     loop {
                         let t = self.expect_type()?;
                         tys.push(t);
-                        if self.eat(TokenKind::Comma) { continue; } else { break; }
+                        if self.eat(TokenKind::Comma) {
+                            continue;
+                        } else {
+                            break;
+                        }
                     }
                 }
                 self.expect(TokenKind::RParen)?;
@@ -611,7 +857,9 @@ impl Parser {
                     TokenKind::RangeType => Type::Range,
                     TokenKind::UsizeType => Type::Usize,
                     TokenKind::IsizeType => Type::Isize,
-                    _ => { return Err(self.unexpected("type")); }
+                    _ => {
+                        return Err(self.unexpected("type"));
+                    }
                 };
                 self.bump();
                 Ok(ty)
@@ -621,6 +869,9 @@ impl Parser {
 
     fn unexpected(&self, expected: &str) -> Error {
         let t = self.cur_token();
-        Error::parse(format!("Unexpected token {:?} at {}:{}, expected {}", t.kind, t.line, t.col, expected))
+        Error::parse(format!(
+            "Unexpected token {:?} at {}:{}, expected {}",
+            t.kind, t.line, t.col, expected
+        ))
     }
 }

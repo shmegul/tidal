@@ -5,9 +5,9 @@
 //!
 //! See the LICENSE file in the root directory of this project for license details.
 
-pub mod value;
 pub mod env;
+pub mod value;
 pub mod vm;
 
-pub use value::Value;
 pub use env::Env;
+pub use value::Value;

@@ -34,7 +34,11 @@ impl fmt::Display for Value {
                 write!(f, "[")?;
                 let mut first = true;
                 for v in items {
-                    if !first { write!(f, ", ")?; } else { first = false; }
+                    if !first {
+                        write!(f, ", ")?;
+                    } else {
+                        first = false;
+                    }
                     write!(f, "{}", v)?;
                 }
                 write!(f, "]")
@@ -43,7 +47,11 @@ impl fmt::Display for Value {
                 write!(f, "(")?;
                 let mut first = true;
                 for v in items {
-                    if !first { write!(f, ", ")?; } else { first = false; }
+                    if !first {
+                        write!(f, ", ")?;
+                    } else {
+                        first = false;
+                    }
                     write!(f, "{}", v)?;
                 }
                 write!(f, ")")

@@ -57,11 +57,11 @@ pub enum TokenKind {
     Colon,
     Equal,
     EqEq,
-    NotEqual,    // !=
-    Less,        // <
-    Greater,     // >
-    LessEqual,   // <=
-    GreaterEqual,// >=
+    NotEqual,     // !=
+    Less,         // <
+    Greater,      // >
+    LessEqual,    // <=
+    GreaterEqual, // >=
     Plus,
     Minus,
     Star,
@@ -73,11 +73,11 @@ pub enum TokenKind {
     SlashEqual,
     PercentEqual,
     // bitwise and power
-    Ampersand,   // &
-    Pipe,        // |
-    Caret,       // ^
-    Tilde,       // ~ (bitwise not)
-    Power,       // **
+    Ampersand, // &
+    Pipe,      // |
+    Caret,     // ^
+    Tilde,     // ~ (bitwise not)
+    Power,     // **
     // shifts (<<, >>) and optional = variants
     SSLeft,
     SSRight,

@@ -17,7 +17,11 @@ pub fn execute(cmd: Command) -> i32 {
     match cmd {
         Command::Help => 0,
         Command::Version => 0,
-        Command::RunFile { path, dump_bc, dump_ast } => run_file(&path, dump_bc, dump_ast),
+        Command::RunFile {
+            path,
+            dump_bc,
+            dump_ast,
+        } => run_file(&path, dump_bc, dump_ast),
         Command::Fatal(_) => 1, // Should be handled in main; return non-zero as a fallback
     }
 }
@@ -45,29 +49,37 @@ fn run_file(path: &str, dump_bc: bool, dump_ast: bool) -> i32 {
     }
 
     if dump_bc {
-        use tidal_runtime::vm::{compile as vm_compile, CompileOutcome};
+        use tidal_runtime::vm::{CompileOutcome, compile as vm_compile};
         return match vm_compile(&program_ast) {
             CompileOutcome::Bytecode(bc) => {
                 let dump_path = {
                     let p = Path::new(path);
                     let mut s = p.with_extension("");
-                    if s == p { s = p.to_path_buf(); }
+                    if s == p {
+                        s = p.to_path_buf();
+                    }
                     s.set_extension("tdbc");
                     s
                 };
                 // Match exactly what println!("{}", bc) would output by adding a trailing newline
                 let dump_str = format!("{}\n", bc);
                 if let Err(e) = fs::write(&dump_path, dump_str.as_bytes()) {
-                    eprintln!("Failed to write bytecode dump {}: {}", dump_path.display(), e);
+                    eprintln!(
+                        "Failed to write bytecode dump {}: {}",
+                        dump_path.display(),
+                        e
+                    );
                     return 1;
                 }
                 0
             }
             CompileOutcome::Unsupported => {
-                eprintln!("Bytecode dump not available: VM does not support all features in this file.");
+                eprintln!(
+                    "Bytecode dump not available: VM does not support all features in this file."
+                );
                 1
             }
-        }
+        };
     }
 
     let mut env = Env::new();

@@ -8,5 +8,5 @@
 pub mod bytecode;
 pub mod codegen;
 
-pub use codegen::{compile, CompileOutcome};
 pub use bytecode::{Bytecode, Instr};
+pub use codegen::{CompileOutcome, compile};

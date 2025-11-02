@@ -5,8 +5,8 @@
 //!
 //! See the LICENSE file in the root directory of this project for license details.
 
-pub mod token;
 pub mod lexer;
+pub mod token;
 
-pub use token::{Token, TokenKind};
 pub use lexer::lex;
+pub use token::{Token, TokenKind};

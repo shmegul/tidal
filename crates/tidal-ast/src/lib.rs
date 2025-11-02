@@ -5,14 +5,14 @@
 //!
 //! See the LICENSE file in the root directory of this project for license details.
 
-pub mod types;
-pub mod ops;
 pub mod expr;
-pub mod stmt;
+pub mod ops;
 pub mod program;
+pub mod stmt;
+pub mod types;
 
-pub use types::Type;
-pub use ops::Op;
 pub use expr::Expr;
-pub use stmt::Stmt;
+pub use ops::Op;
 pub use program::Program;
+pub use stmt::Stmt;
+pub use types::Type;

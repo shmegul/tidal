@@ -13,14 +13,14 @@ pub enum Type {
     Float,
     Double,
     Char,
-    
+
     Int8,
     Int16,
     Int32,
     Int64,
     Int128,
     BigInt,
-    
+
     UnInt,
     UnInt8,
     UnInt16,
@@ -28,11 +28,11 @@ pub enum Type {
     UnInt64,
     UnInt128,
     UnBigInt,
-    
+
     Range,
     Usize,
     Isize,
-    
+
     Array(Box<Type>, usize),
     Tuple(Vec<Type>),
 }

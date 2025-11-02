@@ -5,8 +5,8 @@
 //!
 //! See the LICENSE file in the root directory of this project for license details.
 
-use std::rc::Rc;
 use std::fmt;
+use std::rc::Rc;
 
 use tidal_ast::Type;
 
@@ -40,10 +40,17 @@ pub enum Instr {
     // make an iterator from two ints on stack (left..right)
     Range,
     // variable declarations bound to local slot (shadowing allowed by reusing slot)
-    LetLocal { slot: usize, mutable: bool }, // pop value, set local, and (once) insert into Env
+    LetLocal {
+        slot: usize,
+        mutable: bool,
+    }, // pop value, set local, and (once) insert into Env
     // for-loop: expects top of stack to be Iterator; sets up loop, executes body, repeats
     // body_len is number of instructions forming the loop body
-    ForStart { slot: usize, mutable: bool, body_len: usize },
+    ForStart {
+        slot: usize,
+        mutable: bool,
+        body_len: usize,
+    },
     ForEnd,
     // loop control
     Break,
@@ -56,7 +63,7 @@ pub enum Instr {
     ScopeEnter,
     ScopeExit,
     // Indexing
-    IndexLoad(usize), // expects base value on stack top; loads base.idx
+    IndexLoad(usize),  // expects base value on stack top; loads base.idx
     IndexStore(usize), // expects rhs on stack, and base in a local slot indicated? Simplified: not used yet
     // Super-instructions
     IncLocal(usize), // increment local slot by 1 (no stack traffic)
@@ -65,10 +72,10 @@ pub enum Instr {
 #[derive(Debug, Clone)]
 pub struct Bytecode {
     pub code: Vec<Instr>,
-    pub consts: Vec<Rc<String>>,     // string pool
-    pub names: Vec<Rc<String>>,      // name pool
-    pub slot_name_idx: Vec<usize>,   // slot -> name index
-    pub has_static_types: bool,       // parser type checker validated types; VM can skip dynamic type checks
+    pub consts: Vec<Rc<String>>,   // string pool
+    pub names: Vec<Rc<String>>,    // name pool
+    pub slot_name_idx: Vec<usize>, // slot -> name index
+    pub has_static_types: bool, // parser type checker validated types; VM can skip dynamic type checks
 }
 
 impl Instr {
@@ -95,8 +102,19 @@ impl Instr {
             Instr::JumpIfFalse(t) => format!("JumpIfFalse {}", t),
             Instr::CastTo(ty) => format!("CastTo {:?}", ty),
             Instr::Range => "Range".into(),
-            Instr::LetLocal { slot, mutable } => format!("LetLocal ${}{}", slot, if *mutable { " mut" } else { "" }),
-            Instr::ForStart { slot, mutable, body_len } => format!("ForStart ${}{} body_len={} ", slot, if *mutable { " mut" } else { "" }, body_len),
+            Instr::LetLocal { slot, mutable } => {
+                format!("LetLocal ${}{}", slot, if *mutable { " mut" } else { "" })
+            }
+            Instr::ForStart {
+                slot,
+                mutable,
+                body_len,
+            } => format!(
+                "ForStart ${}{} body_len={} ",
+                slot,
+                if *mutable { " mut" } else { "" },
+                body_len
+            ),
             Instr::ForEnd => "ForEnd".into(),
             Instr::Break => "Break".into(),
             Instr::Continue => "Continue".into(),

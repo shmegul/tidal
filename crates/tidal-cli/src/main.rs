@@ -5,8 +5,8 @@
 //!
 //! See the LICENSE file in the root directory of this project for license details.
 
-mod run;
 mod cli;
+mod run;
 
 fn main() {
     let (program, cmd) = cli::parse_env();

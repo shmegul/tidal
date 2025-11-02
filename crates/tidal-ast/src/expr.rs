@@ -5,7 +5,7 @@
 //!
 //! See the LICENSE file in the root directory of this project for license details.
 
-use crate::{ops::Op, stmt::Stmt, Type};
+use crate::{Type, ops::Op, stmt::Stmt};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {

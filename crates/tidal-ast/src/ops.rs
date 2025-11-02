@@ -6,7 +6,7 @@
 //! See the LICENSE file in the root directory of this project for license details.
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Op { 
+pub enum Op {
     Add,
     Sub,
     Mul,

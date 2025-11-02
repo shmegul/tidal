@@ -11,7 +11,11 @@ use std::env;
 pub enum Command {
     Help,
     Version,
-    RunFile { path: String, dump_bc: bool, dump_ast: bool },
+    RunFile {
+        path: String,
+        dump_bc: bool,
+        dump_ast: bool,
+    },
     Fatal(String),
 }
 
@@ -47,7 +51,10 @@ pub fn parse_env() -> (String, Command) {
         other => {
             let path = other.to_string();
             if !path.ends_with(".td") {
-                return (program, Command::Fatal(format!("\x1b[31mfatal\x1b[0m: unknown command '{}'", other)));
+                return (
+                    program,
+                    Command::Fatal(format!("\x1b[31mfatal\x1b[0m: unknown command '{}'", other)),
+                );
             }
             let mut dump_bc = false;
             let mut dump_ast = false;
@@ -55,10 +62,25 @@ pub fn parse_env() -> (String, Command) {
                 match a.as_str() {
                     "--dump-bytecode" => dump_bc = true,
                     "--dump-ast" => dump_ast = true,
-                    unknown => return (program, Command::Fatal(format!("\x1b[31mfatal\x1b[0m: unknown command '{}'", unknown))),
+                    unknown => {
+                        return (
+                            program,
+                            Command::Fatal(format!(
+                                "\x1b[31mfatal\x1b[0m: unknown command '{}'",
+                                unknown
+                            )),
+                        );
+                    }
                 }
             }
-            (program, Command::RunFile { path, dump_bc, dump_ast })
+            (
+                program,
+                Command::RunFile {
+                    path,
+                    dump_bc,
+                    dump_ast,
+                },
+            )
         }
     }
 }
