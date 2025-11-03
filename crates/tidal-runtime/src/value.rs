@@ -60,3 +60,20 @@ impl fmt::Display for Value {
         }
     }
 }
+
+impl Value {
+    #[inline(always)]
+    pub fn is_int(&self) -> bool {
+        matches!(self, Value::Int(_))
+    }
+
+    #[inline(always)]
+    /// # Safety
+    /// Caller must ensure `self` is `Value::Int`; otherwise calling this function is undefined behavior.
+    pub unsafe fn as_int_unchecked(&self) -> i64 {
+        match self {
+            Value::Int(n) => *n,
+            _ => unsafe { std::hint::unreachable_unchecked() },
+        }
+    }
+}

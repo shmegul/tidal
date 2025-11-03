@@ -5,7 +5,7 @@
 //!
 //! See the LICENSE file in the root directory of this project for license details.
 
-use crate::env::{Binding, Env};
+use crate::env::Env;
 use crate::value::Value;
 use tidal_ast::{Program, Type};
 use tidal_errors::{Error, Result};
@@ -40,6 +40,23 @@ pub fn run(env: &mut Env, bc: &Bytecode) -> Result<Option<(Value, bool)>> {
             Ok((x, y))
         } else {
             Err(Error::runtime("Type mismatch: expected Int operands"))
+        }
+    }
+
+    // Fast helpers used in static-typed mode (hot path)
+    #[inline(always)]
+    fn pop2_fast(stack: &mut Vec<Value>) -> (Value, Value) {
+        let b = stack.pop().unwrap();
+        let a = stack.pop().unwrap();
+        (a, b)
+    }
+    #[inline(always)]
+    fn pop2_int_fast(stack: &mut Vec<Value>) -> (i64, i64) {
+        let (a, b) = pop2_fast(stack);
+        if a.is_int() && b.is_int() {
+            unsafe { (a.as_int_unchecked(), b.as_int_unchecked()) }
+        } else {
+            panic!("expected Int operands");
         }
     }
 
@@ -194,10 +211,6 @@ pub fn run(env: &mut Env, bc: &Bytecode) -> Result<Option<(Value, bool)>> {
     let mut last: Option<(Value, bool)> = None;
     // locals storage
     let mut locals: Vec<Value> = vec![Value::Int(0); bc.slot_name_idx.len()];
-    // track if we've exported a slot into Env already (avoid repeated inserts)
-    let mut slot_exported: Vec<bool> = vec![false; bc.slot_name_idx.len()];
-    // per-slot cached type to avoid repeated env.infer_type_public
-    let mut slot_type: Vec<Option<Type>> = vec![None; bc.slot_name_idx.len()];
     // track mutability per slot; LetLocal and ForStart set this
     let mut slot_mutable: Vec<bool> = vec![false; bc.slot_name_idx.len()];
 
@@ -212,17 +225,6 @@ pub fn run(env: &mut Env, bc: &Bytecode) -> Result<Option<(Value, bool)>> {
         body_end: usize,
     }
     let mut loops: Vec<LoopFrame> = Vec::with_capacity(64);
-
-    // Simple scope stack for Env exports (REPL-only)
-    #[derive(Clone)]
-    struct ExportedVar {
-        name: String,
-        slot: usize,
-        prev: Option<Binding>,
-    }
-    let mut scope_stack: Vec<Vec<ExportedVar>> = Vec::new();
-    // Global scope frame to catch top-level exports
-    scope_stack.push(Vec::new());
 
     while ip < code.len() {
         match &code[ip] {
@@ -274,49 +276,62 @@ pub fn run(env: &mut Env, bc: &Bytecode) -> Result<Option<(Value, bool)>> {
                 ip += 1;
             }
             Instr::ScopeEnter => {
-                scope_stack.push(Vec::new());
+                // Scopes are a no-op for the VM hot path now; REPL export removed
                 ip += 1;
             }
             Instr::ScopeExit => {
-                // Pop one scope and clean Env exports if any
-                if let Some(frame) = scope_stack.pop() {
-                    if env.should_export_vm_locals() {
-                        for ev in frame.into_iter().rev() {
-                            if let Some(prev) = ev.prev {
-                                env.insert_binding_public(ev.name, prev);
-                            } else {
-                                let _ = env.remove_binding_public(&ev.name);
-                            }
-                            // Allow re-export of this slot in future scopes
-                            slot_exported[ev.slot] = false;
-                        }
-                    } else {
-                        // Even if we didn't export to Env, clear the flags so the slot can be exported in a later scope if needed
-                        for ev in frame.into_iter().rev() {
-                            slot_exported[ev.slot] = false;
-                        }
-                    }
-                }
+                // Scopes are a no-op for the VM hot path now; REPL export removed
                 ip += 1;
             }
             Instr::Add => {
-                arith_add(&mut stack, bc.has_static_types)?;
+                if bc.has_static_types {
+                    let (x, y) = pop2_int_fast(&mut stack);
+                    stack.push(Value::Int(x.wrapping_add(y)));
+                } else {
+                    arith_add(&mut stack, false)?;
+                }
                 ip += 1;
             }
             Instr::Sub => {
-                arith_sub(&mut stack, bc.has_static_types)?;
+                if bc.has_static_types {
+                    let (x, y) = pop2_int_fast(&mut stack);
+                    stack.push(Value::Int(x.wrapping_sub(y)));
+                } else {
+                    arith_sub(&mut stack, false)?;
+                }
                 ip += 1;
             }
             Instr::Mul => {
-                arith_mul(&mut stack, bc.has_static_types)?;
+                if bc.has_static_types {
+                    let (x, y) = pop2_int_fast(&mut stack);
+                    stack.push(Value::Int(x.saturating_mul(y)));
+                } else {
+                    arith_mul(&mut stack, false)?;
+                }
                 ip += 1;
             }
             Instr::Div => {
-                arith_div(&mut stack, bc.has_static_types)?;
+                if bc.has_static_types {
+                    let (x, y) = pop2_int_fast(&mut stack);
+                    if y == 0 {
+                        return Err(Error::runtime("Division by zero"));
+                    }
+                    stack.push(Value::Int(x / y));
+                } else {
+                    arith_div(&mut stack, false)?;
+                }
                 ip += 1;
             }
             Instr::Rem => {
-                arith_rem(&mut stack, bc.has_static_types)?;
+                if bc.has_static_types {
+                    let (x, y) = pop2_int_fast(&mut stack);
+                    if y == 0 {
+                        return Err(Error::runtime("Division by zero"));
+                    }
+                    stack.push(Value::Int(x % y));
+                } else {
+                    arith_rem(&mut stack, false)?;
+                }
                 ip += 1;
             }
             Instr::CmpEq
@@ -325,8 +340,22 @@ pub fn run(env: &mut Env, bc: &Bytecode) -> Result<Option<(Value, bool)>> {
             | Instr::CmpGt
             | Instr::CmpLe
             | Instr::CmpGe => {
-                let op = &code[ip];
-                cmp_apply(op, &mut stack, bc.has_static_types)?;
+                if bc.has_static_types {
+                    let (x, y) = pop2_int_fast(&mut stack);
+                    let outb = match &code[ip] {
+                        Instr::CmpEq => x == y,
+                        Instr::CmpNe => x != y,
+                        Instr::CmpLt => x < y,
+                        Instr::CmpGt => x > y,
+                        Instr::CmpLe => x <= y,
+                        Instr::CmpGe => x >= y,
+                        _ => unreachable!(),
+                    };
+                    stack.push(Value::Bool(outb));
+                } else {
+                    let op = &code[ip];
+                    cmp_apply(op, &mut stack, false)?;
+                }
                 ip += 1;
             }
             Instr::Jump(target) => {
@@ -374,44 +403,11 @@ pub fn run(env: &mut Env, bc: &Bytecode) -> Result<Option<(Value, bool)>> {
                 ip += 1;
             }
             Instr::LetLocal { slot, mutable } => {
-                let v = stack
-                    .pop()
-                    .ok_or_else(|| Error::runtime("stack underflow"))?;
-                locals[*slot] = v.clone();
+                // Fast path: no Env exports; minimal checks
+                let v = stack.pop().unwrap();
+                locals[*slot] = v;
                 // Update mutability for this slot according to declaration
                 slot_mutable[*slot] = *mutable;
-                // Insert into Env only once per slot to avoid hot-path hashmap churn
-                if !slot_exported[*slot] {
-                    slot_exported[*slot] = true;
-                    if env.should_export_vm_locals() {
-                        let name_idx = bc.slot_name_idx[*slot];
-                        let name = bc.names[name_idx].as_ref().clone();
-                        // Use cached type if available; otherwise infer once and cache
-                        let ty = if let Some(t) = &slot_type[*slot] {
-                            t.clone()
-                        } else {
-                            let t = env.infer_type_public(&v);
-                            slot_type[*slot] = Some(t.clone());
-                            t
-                        };
-                        let prev = env.get_binding_cloned_public(&name);
-                        let binding = Binding {
-                            mutable: *mutable,
-                            ty,
-                            value: v.clone(),
-                        };
-                        env.insert_binding_public(name.clone(), binding);
-                        if let Some(frame) = scope_stack.last_mut() {
-                            frame.push(ExportedVar {
-                                name,
-                                slot: *slot,
-                                prev,
-                            });
-                        }
-                    }
-                } else {
-                    // Slot already exported: do NOT update Env on every iteration; keep updates in locals only to avoid hot-path hashmap lookups.
-                }
                 // Do not update `last` here — internal declaration
                 ip += 1;
             }
@@ -420,9 +416,7 @@ pub fn run(env: &mut Env, bc: &Bytecode) -> Result<Option<(Value, bool)>> {
                 mutable,
                 body_len,
             } => {
-                let it = stack
-                    .pop()
-                    .ok_or_else(|| Error::runtime("stack underflow"))?;
+                let it = stack.pop().unwrap();
                 let (start, end) = match it {
                     Value::Range(a, b) => (a, b),
                     other => {
@@ -442,34 +436,6 @@ pub fn run(env: &mut Env, bc: &Bytecode) -> Result<Option<(Value, bool)>> {
                     locals[*slot] = Value::Int(cur);
                     // Loop variable mutability is defined by the 'mutable' flag
                     slot_mutable[*slot] = *mutable;
-                    if env.should_export_vm_locals() {
-                        // Insert initial binding into Env for external visibility and track in scope
-                        let name_idx = bc.slot_name_idx[*slot];
-                        let name = bc.names[name_idx].as_ref().clone();
-                        let v = locals[*slot].clone();
-                        // Use cached type if available, otherwise infer once and cache
-                        let ty = if let Some(t) = &slot_type[*slot] {
-                            t.clone()
-                        } else {
-                            let t = env.infer_type_public(&v);
-                            slot_type[*slot] = Some(t.clone());
-                            t
-                        };
-                        let prev = env.get_binding_cloned_public(&name);
-                        let binding = Binding {
-                            mutable: *mutable,
-                            ty,
-                            value: v,
-                        };
-                        env.insert_binding_public(name.clone(), binding);
-                        if let Some(frame) = scope_stack.last_mut() {
-                            frame.push(ExportedVar {
-                                name,
-                                slot: *slot,
-                                prev,
-                            });
-                        }
-                    }
                     loops.push(LoopFrame {
                         slot: *slot,
                         current: cur,
