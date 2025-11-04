@@ -11,7 +11,8 @@ use tidal_errors::{Error, Result};
 
 #[derive(Default)]
 pub struct TypeCtx {
-    pub vars: HashMap<String, Type>,
+    // variable name -> (type, mutable)
+    pub vars: HashMap<String, (Type, bool)>,
 }
 
 fn is_int_like(t: &Type) -> bool {
@@ -51,13 +52,13 @@ pub fn typecheck_program(program: &Program) -> Result<()> {
 fn typecheck_stmt(stmt: &Stmt, ctx: &mut TypeCtx) -> Result<()> {
     match stmt {
         Stmt::Let {
-            mutable: _,
+            mutable,
             name,
             ty,
             expr,
         } => {
             let expr_ty = infer_expr_type(expr, ctx)?;
-            if let Some(t) = ty {
+            let final_ty = if let Some(t) = ty {
                 if &expr_ty != t {
                     // Permit Float <-> Double inits without explicit cast for ergonomics
                     let float_double_ok = matches!(
@@ -71,68 +72,105 @@ fn typecheck_stmt(stmt: &Stmt, ctx: &mut TypeCtx) -> Result<()> {
                         )));
                     }
                 }
-                ctx.vars.insert(name.clone(), t.clone());
+                t.clone()
             } else {
-                ctx.vars.insert(name.clone(), expr_ty);
-            }
+                expr_ty
+            };
+            ctx.vars.insert(name.clone(), (final_ty, *mutable));
             Ok(())
         }
         Stmt::AddAssign { name, expr } => {
-            let lhs = ctx
+            let (lhs_ty, mutable) = ctx
                 .vars
                 .get(name)
-                .ok_or_else(|| Error::parse(format!("Unknown variable '{}'", name)))?
-                .clone();
+                .cloned()
+                .ok_or_else(|| Error::parse(format!("Unknown variable '{}'", name)))?;
+            if !mutable {
+                return Err(Error::parse(format!(
+                    "Cannot assign to immutable variable '{}'",
+                    name
+                )));
+            }
             let rhs = infer_expr_type(expr, ctx)?;
-            ensure_binary_ok("+=", &lhs, &rhs)?;
+            ensure_binary_ok("+=", &lhs_ty, &rhs)?;
             Ok(())
         }
         Stmt::SubAssign { name, expr } => {
-            let lhs = ctx
+            let (lhs_ty, mutable) = ctx
                 .vars
                 .get(name)
-                .ok_or_else(|| Error::parse(format!("Unknown variable '{}'", name)))?
-                .clone();
+                .cloned()
+                .ok_or_else(|| Error::parse(format!("Unknown variable '{}'", name)))?;
+            if !mutable {
+                return Err(Error::parse(format!(
+                    "Cannot assign to immutable variable '{}'",
+                    name
+                )));
+            }
             let rhs = infer_expr_type(expr, ctx)?;
-            ensure_binary_ok("-=", &lhs, &rhs)?;
+            ensure_binary_ok("-=", &lhs_ty, &rhs)?;
             Ok(())
         }
         Stmt::MulAssign { name, expr } => {
-            let lhs = ctx
+            let (lhs_ty, mutable) = ctx
                 .vars
                 .get(name)
-                .ok_or_else(|| Error::parse(format!("Unknown variable '{}'", name)))?
-                .clone();
+                .cloned()
+                .ok_or_else(|| Error::parse(format!("Unknown variable '{}'", name)))?;
+            if !mutable {
+                return Err(Error::parse(format!(
+                    "Cannot assign to immutable variable '{}'",
+                    name
+                )));
+            }
             let rhs = infer_expr_type(expr, ctx)?;
-            ensure_binary_ok("* =", &lhs, &rhs)?;
+            ensure_binary_ok("*=", &lhs_ty, &rhs)?;
             Ok(())
         }
         Stmt::DivAssign { name, expr } => {
-            let lhs = ctx
+            let (lhs_ty, mutable) = ctx
                 .vars
                 .get(name)
-                .ok_or_else(|| Error::parse(format!("Unknown variable '{}'", name)))?
-                .clone();
+                .cloned()
+                .ok_or_else(|| Error::parse(format!("Unknown variable '{}'", name)))?;
+            if !mutable {
+                return Err(Error::parse(format!(
+                    "Cannot assign to immutable variable '{}'",
+                    name
+                )));
+            }
             let rhs = infer_expr_type(expr, ctx)?;
-            ensure_binary_ok("/=", &lhs, &rhs)?;
+            ensure_binary_ok("/=", &lhs_ty, &rhs)?;
             Ok(())
         }
         Stmt::RemAssign { name, expr } => {
-            let lhs = ctx
+            let (lhs_ty, mutable) = ctx
                 .vars
                 .get(name)
-                .ok_or_else(|| Error::parse(format!("Unknown variable '{}'", name)))?
-                .clone();
+                .cloned()
+                .ok_or_else(|| Error::parse(format!("Unknown variable '{}'", name)))?;
+            if !mutable {
+                return Err(Error::parse(format!(
+                    "Cannot assign to immutable variable '{}'",
+                    name
+                )));
+            }
             let rhs = infer_expr_type(expr, ctx)?;
-            ensure_binary_ok("%=", &lhs, &rhs)?;
+            ensure_binary_ok("%=", &lhs_ty, &rhs)?;
             Ok(())
         }
         Stmt::AssignIndex { name, index, expr } => {
-            let target_ty = ctx
+            let (target_ty, mutable) = ctx
                 .vars
                 .get(name)
-                .ok_or_else(|| Error::parse(format!("Unknown variable '{}'", name)))?
-                .clone();
+                .cloned()
+                .ok_or_else(|| Error::parse(format!("Unknown variable '{}'", name)))?;
+            if !mutable {
+                return Err(Error::parse(format!(
+                    "Cannot assign to immutable variable '{}'",
+                    name
+                )));
+            }
             let rhs_ty = infer_expr_type(expr, ctx)?;
             match target_ty {
                 Type::Array(elem, len) => {
@@ -166,7 +204,7 @@ fn typecheck_stmt(stmt: &Stmt, ctx: &mut TypeCtx) -> Result<()> {
             }
         }
         Stmt::For {
-            mutable: _,
+            mutable,
             name,
             iter,
             body,
@@ -182,10 +220,17 @@ fn typecheck_stmt(stmt: &Stmt, ctx: &mut TypeCtx) -> Result<()> {
                     )));
                 }
             };
-            ctx.vars.insert(name.clone(), loop_var_ty);
-            for s in body {
-                typecheck_stmt(s, ctx)?;
+            // Create an inner scope for the 'for' body to avoid leaking declarations
+            let mut inner = TypeCtx::default();
+            for (k, v) in &ctx.vars {
+                inner.vars.insert(k.clone(), v.clone());
             }
+            // Insert loop variable into inner scope only
+            inner.vars.insert(name.clone(), (loop_var_ty, *mutable));
+            for s in body {
+                typecheck_stmt(s, &mut inner)?;
+            }
+            // Do not merge inner changes back; loop-scoped vars (including loop var) do not escape
             Ok(())
         }
         Stmt::While { cond, body } => {
@@ -228,6 +273,20 @@ fn ensure_binary_ok(op: &str, l: &Type, r: &Type) -> Result<()> {
     }
 }
 
+fn unify_types(a: Type, b: Type) -> Result<Type> {
+    if a == b {
+        return Ok(a);
+    }
+    // Allow Float/Double to unify to Double
+    match (a, b) {
+        (Type::Float, Type::Double) | (Type::Double, Type::Float) => Ok(Type::Double),
+        (left, right) => Err(Error::parse(format!(
+            "Type mismatch between branches: {:?} vs {:?}",
+            left, right
+        ))),
+    }
+}
+
 pub fn infer_expr_type(expr: &Expr, ctx: &TypeCtx) -> Result<Type> {
     match expr {
         Expr::Int(_) => Ok(Type::Int),
@@ -239,7 +298,7 @@ pub fn infer_expr_type(expr: &Expr, ctx: &TypeCtx) -> Result<Type> {
         Expr::Ident(name) => ctx
             .vars
             .get(name)
-            .cloned()
+            .map(|(t, _)| t.clone())
             .ok_or_else(|| Error::parse(format!("Unknown variable '{}'", name))),
         Expr::Binary(l, op, r) => {
             use tidal_ast::ops::Op;
@@ -290,42 +349,71 @@ pub fn infer_expr_type(expr: &Expr, ctx: &TypeCtx) -> Result<Type> {
             }
         }
         Expr::Block(stmts) => {
-            let mut inner = TypeCtx {
-                vars: ctx.vars.clone(),
-            };
-            let mut last: Option<Type> = None;
+            // Create inner scope copying current bindings (shallow copy)
+            let mut inner = TypeCtx::default();
+            for (k, v) in &ctx.vars {
+                inner.vars.insert(k.clone(), v.clone());
+            }
+            let mut last_ty: Option<Type> = None;
             for s in stmts {
-                typecheck_stmt(s, &mut inner)?;
-                last = Some(Type::Int);
-            } // block value typing not used by VM now
-            Ok(last.unwrap_or(Type::Int))
+                match s {
+                    Stmt::ExprStmt(e) => {
+                        last_ty = Some(infer_expr_type(e, &inner)?);
+                    }
+                    _ => {
+                        typecheck_stmt(s, &mut inner)?;
+                    }
+                }
+            }
+            Ok(last_ty.unwrap_or(Type::Int))
         }
         Expr::If {
             branches,
             else_branch,
         } => {
-            // Ensure each condition is Bool and branch bodies are type-checked. Result type is ignored by VM.
+            // Infer each branch in its own inner scope and compute last expr type; unify types
+            let mut result_ty: Option<Type> = None;
             for (cond, blk) in branches {
                 let ct = infer_expr_type(cond, ctx)?;
                 if ct != Type::Bool {
                     return Err(Error::parse("If condition must be Bool"));
                 }
-                let mut inner = TypeCtx {
-                    vars: ctx.vars.clone(),
-                };
-                for s in blk {
-                    typecheck_stmt(s, &mut inner)?;
+                let mut inner = TypeCtx::default();
+                for (k, v) in &ctx.vars {
+                    inner.vars.insert(k.clone(), v.clone());
                 }
+                let mut last_ty: Option<Type> = None;
+                for s in blk {
+                    match s {
+                        Stmt::ExprStmt(e) => last_ty = Some(infer_expr_type(e, &inner)?),
+                        _ => typecheck_stmt(s, &mut inner)?,
+                    }
+                }
+                let branch_ty = last_ty.unwrap_or(Type::Int);
+                result_ty = Some(match result_ty {
+                    None => branch_ty,
+                    Some(prev) => unify_types(prev, branch_ty)?,
+                });
             }
             if let Some(blk) = else_branch {
-                let mut inner = TypeCtx {
-                    vars: ctx.vars.clone(),
-                };
-                for s in blk {
-                    typecheck_stmt(s, &mut inner)?;
+                let mut inner = TypeCtx::default();
+                for (k, v) in &ctx.vars {
+                    inner.vars.insert(k.clone(), v.clone());
                 }
+                let mut last_ty: Option<Type> = None;
+                for s in blk {
+                    match s {
+                        Stmt::ExprStmt(e) => last_ty = Some(infer_expr_type(e, &inner)?),
+                        _ => typecheck_stmt(s, &mut inner)?,
+                    }
+                }
+                let else_ty = last_ty.unwrap_or(Type::Int);
+                result_ty = Some(match result_ty {
+                    None => else_ty,
+                    Some(prev) => unify_types(prev, else_ty)?,
+                });
             }
-            Ok(Type::Int)
+            Ok(result_ty.unwrap_or(Type::Int))
         }
         Expr::Cast(e, ty) => {
             let _ = infer_expr_type(e, ctx)?; // ensure source type exists
