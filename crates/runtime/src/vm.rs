@@ -528,7 +528,9 @@ pub fn run(env: &mut Env, bc: &Bytecode) -> Result<Option<(Value, bool)>> {
                 } else {
                     let mut items: Vec<Value> = Vec::with_capacity(*n);
                     for _ in 0..*n {
-                        let v = stack.pop().ok_or_else(|| Error::runtime("stack underflow"))?;
+                        let v = stack
+                            .pop()
+                            .ok_or_else(|| Error::runtime("stack underflow"))?;
                         items.push(v);
                     }
                     items.reverse();
@@ -542,7 +544,9 @@ pub fn run(env: &mut Env, bc: &Bytecode) -> Result<Option<(Value, bool)>> {
                 } else {
                     let mut items: Vec<Value> = Vec::with_capacity(*n);
                     for _ in 0..*n {
-                        let v = stack.pop().ok_or_else(|| Error::runtime("stack underflow"))?;
+                        let v = stack
+                            .pop()
+                            .ok_or_else(|| Error::runtime("stack underflow"))?;
                         items.push(v);
                     }
                     items.reverse();
