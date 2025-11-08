@@ -148,6 +148,25 @@ pub fn compile(program: &Program) -> CompileOutcome {
                 out.push(Instr::LoadInt(*f as i64));
                 Ok(())
             }
+            Expr::Array(items) => {
+                for it in items.iter() {
+                    compile_expr_inner(it, out, slots, slot_of, names, name_to_idx, consts)?;
+                }
+                out.push(Instr::NewArray(items.len()));
+                Ok(())
+            }
+            Expr::Tuple(items) => {
+                for it in items.iter() {
+                    compile_expr_inner(it, out, slots, slot_of, names, name_to_idx, consts)?;
+                }
+                out.push(Instr::NewTuple(items.len()));
+                Ok(())
+            }
+            Expr::Index(base, idx) => {
+                compile_expr_inner(base, out, slots, slot_of, names, name_to_idx, consts)?;
+                out.push(Instr::IndexLoad(*idx));
+                Ok(())
+            }
             Expr::Ident(name) => {
                 // Try to find an existing slot; if not found, conservatively create one.
                 // This avoids Unsupported due to compile-time ordering or shadowing differences.

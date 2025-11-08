@@ -522,6 +522,34 @@ pub fn run(env: &mut Env, bc: &Bytecode) -> Result<Option<(Value, bool)>> {
             Instr::IndexStore(_idx) => {
                 return Err(Error::runtime("IndexStore not supported yet in VM"));
             }
+            Instr::NewArray(n) => {
+                if *n == 0 {
+                    stack.push(Value::Array(Vec::new()));
+                } else {
+                    let mut items: Vec<Value> = Vec::with_capacity(*n);
+                    for _ in 0..*n {
+                        let v = stack.pop().ok_or_else(|| Error::runtime("stack underflow"))?;
+                        items.push(v);
+                    }
+                    items.reverse();
+                    stack.push(Value::Array(items));
+                }
+                ip += 1;
+            }
+            Instr::NewTuple(n) => {
+                if *n == 0 {
+                    stack.push(Value::Tuple(Vec::new()));
+                } else {
+                    let mut items: Vec<Value> = Vec::with_capacity(*n);
+                    for _ in 0..*n {
+                        let v = stack.pop().ok_or_else(|| Error::runtime("stack underflow"))?;
+                        items.push(v);
+                    }
+                    items.reverse();
+                    stack.push(Value::Tuple(items));
+                }
+                ip += 1;
+            }
             Instr::IncLocal(slot) => {
                 // Enforce mutability on updates
                 if !slot_mutable[*slot] {

@@ -65,6 +65,9 @@ pub enum Instr {
     // Indexing
     IndexLoad(usize),  // expects base value on stack top; loads base.idx
     IndexStore(usize), // expects rhs on stack, and base in a local slot indicated? Simplified: not used yet
+    // Aggregate constructors
+    NewArray(usize), // pops N values (in evaluation order: last is top), builds Array
+    NewTuple(usize), // pops N values, builds Tuple
     // Super-instructions
     IncLocal(usize), // increment local slot by 1 (no stack traffic)
 }
@@ -124,6 +127,8 @@ impl Instr {
             Instr::IndexStore(i) => format!("IndexStore {}", i),
             Instr::ScopeEnter => "ScopeEnter".into(),
             Instr::ScopeExit => "ScopeExit".into(),
+            Instr::NewArray(n) => format!("NewArray {}", n),
+            Instr::NewTuple(n) => format!("NewTuple {}", n),
             Instr::IncLocal(s) => format!("IncLocal ${}", s),
         }
     }
