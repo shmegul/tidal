@@ -4,4 +4,4 @@ version = "0.1.10"
 edition = "2024"
 
 [dependencies]
-tidal-ast = { path = "../tidal-ast" }
+tidal-ast = { path = "../ast" }

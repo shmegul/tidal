@@ -1,0 +1,10 @@
+[package]
+name = "tidal-runtime"
+version = "0.3.0"
+edition = "2024"
+
+[dependencies]
+tidal-ast = { path = "../ast" }
+tidal-errors = { path = "../errors" }
+tidal-vm = { path = "../codegen" }
+tidal-jit = { path = "../jit" }

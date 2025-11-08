@@ -1,0 +1,14 @@
+[package]
+name = "tidal-cli"
+version = "0.1.11"
+edition = "2024"
+
+[dependencies]
+tidal-parser = { path = "../parser" }
+tidal-runtime = { path = "../runtime" }
+tidal-errors = { path = "../errors" }
+tidal-vm = { path = "../codegen" }
+
+[[bin]]
+name = "tidal"
+path = "src/main.rs"

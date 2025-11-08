@@ -1,9 +1,0 @@
-[package]
-name = "tidal-parser"
-version = "0.1.11"
-edition = "2024"
-
-[dependencies]
-tidal-lexer = { path = "../tidal-lexer" }
-tidal-ast = { path = "../tidal-ast" }
-tidal-errors = { path = "../tidal-errors" }

@@ -1,12 +1,12 @@
 [workspace]
 members = [
-    "crates/tidal-ast"    ,
-    "crates/tidal-errors" ,
-    "crates/tidal-lexer"  ,
-    "crates/tidal-parser" ,
-    "crates/tidal-runtime",
-    "crates/tidal-cli"    ,
-    "crates/tidal-jit"    ,
-    "crates/tidal-vm"     ,
+    "crates/ast"    ,
+    "crates/errors" ,
+    "crates/lexer"  ,
+    "crates/parser" ,
+    "crates/runtime",
+    "crates/cli"    ,
+    "crates/jit"    ,
+    "crates/codegen",
 ]
 resolver = "2"

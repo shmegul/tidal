@@ -4,4 +4,4 @@ version = "0.1.9"
 edition = "2024"
 
 [dependencies]
-tidal-errors = { path = "../tidal-errors" }
+tidal-errors = { path = "../errors" }

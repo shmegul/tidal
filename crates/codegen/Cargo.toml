@@ -1,0 +1,8 @@
+[package]
+name = "tidal-vm"
+version = "0.2.0"
+edition = "2024"
+
+[dependencies]
+tidal-ast = { path = "../ast" }
+tidal-errors = { path = "../errors" }
