@@ -57,6 +57,35 @@ fn typecheck_stmt(stmt: &Stmt, ctx: &mut TypeCtx) -> Result<()> {
             ty,
             expr,
         } => {
+            // Special case: if a non-`mut` declaration without explicit type appears for an
+            // already-declared name in the current scope, interpret it as an assignment to the
+            // existing variable for the purposes of type checking. This allows `a = expr` to be
+            // validated against the prior binding instead of being treated purely as shadowing.
+            if !*mutable && ty.is_none()
+                && let Some((prev_ty, prev_mut)) = ctx.vars.get(name).cloned()
+            {
+                if !prev_mut {
+                    return Err(Error::parse(format!(
+                        "Cannot assign to immutable variable '{}'",
+                        name
+                    )));
+                }
+                let rhs_ty = infer_expr_type(expr, ctx)?;
+                // Permit Float <-> Double interchange for ergonomics
+                let float_double_ok = matches!(
+                    (&prev_ty, &rhs_ty),
+                    (Type::Float, Type::Double) | (Type::Double, Type::Float)
+                );
+                if prev_ty != rhs_ty && !float_double_ok {
+                    return Err(Error::parse(format!(
+                        "Type mismatch: cannot assign value of type {:?} to variable '{}' of type {:?}",
+                        rhs_ty, name, prev_ty
+                    )));
+                }
+                // Treat as assignment: keep existing entry (type and mutability unchanged)
+                return Ok(());
+            }
+
             let expr_ty = infer_expr_type(expr, ctx)?;
             let final_ty = if let Some(t) = ty {
                 if &expr_ty != t {
