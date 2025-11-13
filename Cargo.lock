@@ -21,6 +21,10 @@ name = "tidal-errors"
 version = "0.1.9"
 
 [[package]]
+name = "tidal-gc"
+version = "0.1.0"
+
+[[package]]
 name = "tidal-jit"
 version = "0.1.10"
 dependencies = [
@@ -36,7 +40,7 @@ dependencies = [
 
 [[package]]
 name = "tidal-parser"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "tidal-ast",
  "tidal-errors",
