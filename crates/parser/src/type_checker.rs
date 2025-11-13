@@ -61,7 +61,8 @@ fn typecheck_stmt(stmt: &Stmt, ctx: &mut TypeCtx) -> Result<()> {
             // already-declared name in the current scope, interpret it as an assignment to the
             // existing variable for the purposes of type checking. This allows `a = expr` to be
             // validated against the prior binding instead of being treated purely as shadowing.
-            if !*mutable && ty.is_none()
+            if !*mutable
+                && ty.is_none()
                 && let Some((prev_ty, prev_mut)) = ctx.vars.get(name).cloned()
             {
                 if !prev_mut {
